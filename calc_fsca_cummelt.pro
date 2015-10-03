@@ -17,8 +17,23 @@ out_dir=snodis_root+'intermediate/'+area+'/'+strcompress(year,/remove_all)+run_n
 
 print,'[SNODIS info] running calc_fsca_cummelt...'
 
-temp_dir=snodis_root+'temp/'+area+'/'
-if ~file_test(temp_dir,/directory) then spawn,'mkdir -p '+temp_dir
+;use environment variable TMPDIR to create /temp on execution node. if running on janus with array job then must change TMPDIR directory in submission script to not include [ ].
+;mytemp=getenv('TMPDIR')
+;temp_dir=mytemp+'/'+'temp/'+area+'/' ;DO include trailing slash.
+;if ~file_test(temp_dir,/directory) then spawn,'mkdir -p '+temp_dir
+
+;escape [ and ] in TMPDIR
+;mytemp=getenv('TMPDIR') ; use next line to escape [ and ] in directory name when running job array.
+;spawn,'printenv TMPDIR | sed "s/\[/\\\[/" | sed "s/\]/\\\]/"',mytemp
+;temp_dir=mytemp+'/'+'temp/'+area+'/' ;DO include trailing slash.
+
+;trying to use symbolic links to define temp_dir
+;mytemp=getenv('TMPDIR')
+;tempf=mytemp+'/'+'temp/'+area+'/'
+;spawn,'mkdir -p '+tempf
+;if ~file_test(tempf,/directory) then spawn,'mkdir -p '+tempf
+;spawn, 'ln -sf '+tempf+' /local/scratch/temp_dir'
+;temp_dir='/local/scratch/temp_dir/'
 
 num_snodis_step=(julday(last_month,last_day,year)-julday(first_month,first_day,year)+1)*24/time_step
 
@@ -43,9 +58,9 @@ cummelt_cube=assoc(7,fltarr(ncols_snodis,nrows_snodis)); cummulative (actual) sn
 ; declare miscellaneous grids for intermediate values.
 melt_grid=fltarr(ncols_snodis,nrows_snodis); [m].
 cummelt_grid=fltarr(ncols_snodis,nrows_snodis); [m].
-potmelt_grid=fltarr(ncols_snodis,nrows_snodis); [m]. 
+potmelt_grid=fltarr(ncols_snodis,nrows_snodis); [m].
 cumpotmelt_grid=fltarr(ncols_snodis,nrows_snodis); [m].
-fsca_grid=fltarr(ncols_snodis, nrows_snodis); [0--1 non-dimensional]. 
+fsca_grid=fltarr(ncols_snodis, nrows_snodis); [0--1 non-dimensional].
 
 for i=0,num_snodis_step-1 do begin
 
@@ -75,7 +90,7 @@ for i=0,num_snodis_step-1 do begin
          interval=count-1
          denominator=cumpotmelt_interp_end[interval]-cumpotmelt_interp_start[interval]
          index=where(denominator eq 0,count,complement=cindex); check for possible divide-by-zero problem during times of no melt.
-         if count eq 0 then begin; no divide-by-zero problem; interpolate as usual. 
+         if count eq 0 then begin; no divide-by-zero problem; interpolate as usual.
             fsca_grid=fsca_interp_start[interval]+(cumpotmelt_grid-cumpotmelt_interp_start[interval])*(fsca_interp_end[interval]-fsca_interp_start[interval])/denominator
          endif else begin; divide-by-zero problem; interpolate only where denominator not equal to 0.
             tmp_fsca_interp_start=fsca_interp_start[interval]
@@ -98,11 +113,11 @@ for i=0,num_snodis_step-1 do begin
    tmp_index=where(fsca_grid gt 1.0,tmp_cnt)
    if tmp_cnt ne 0 then fsca_grid[tmp_index]=1.0
 
-   melt_grid=fsca_grid*potmelt_grid; [m]. 
+   melt_grid=fsca_grid*potmelt_grid; [m].
    cummelt_grid+=melt_grid; [m].
    tmp_index=where(~finite(cummelt_grid),tmp_cnt)
    if tmp_cnt ne 0 then cummelt_grid(tmp_index)=undefo; replace NaN's with undefo for file output.
-   cummelt_cube[i]=cummelt_grid; [m]. 
+   cummelt_cube[i]=cummelt_grid; [m].
    tmp_index=where(~finite(fsca_grid),tmp_cnt)
    if tmp_cnt ne 0 then fsca_grid(tmp_index)=undefo; replace NaN's with undefo for file output.
    fsca_cube[i]=fsca_grid
