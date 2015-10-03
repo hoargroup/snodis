@@ -84,7 +84,8 @@ mytemp=getenv('TMPDIR')
 temp_dir=mytemp+'/'+'temp/'+area+'/'+strcompress(year,/remove_all)+'/' ;DO include trailing slash.
 if ~file_test(temp_dir,/directory) then spawn,'mkdir -p '+temp_dir
 
-; call subroutines.
+
+;call subroutines.
 calc_nldas,'precip'
 calc_nldas,'ps'
 calc_nldas,'sat'
@@ -94,7 +95,7 @@ calc_relhum
 calc_turblong,turbulent_scheme,longwave_scheme
 calc_snowfall
 calc_potalbedo,albedo_scheme
-prepare_fsca_fscamask,fsca_doy; never comment this line since fsca_doy is needed below.
+prepare_fsca_fscamask,fsca_doy; never comment this line since fsca_doy is needed below. first to write to tempdir
 prepare_interppt_doy_fsca,fsca_doy
 calc_mixalbedo,fsca_doy
 ;prepare_ipw; takes a long time, but need to run only once for a certain domain.
@@ -114,7 +115,7 @@ print,'Simulation finished successfully after ',string(((run_ended_at-run_starte
 ;
 ;endfor; end loop over years.
 
-;end; end of program.
+end; end of program.
 exit ; need exit command to shutdown IDL on beach
 
 ; References
