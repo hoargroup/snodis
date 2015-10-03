@@ -6,7 +6,8 @@
 ; Note 1: Input fsca_doy cannot have missing values.
 ; Note 2: Input fsca_cube cannot have missing values (missing value info derived from fscamask_cube).
 ; Note 3: Input fscamask_cube can have missing values. See legend below for translation in this procedure.
-;         0-1 (fractional snow; >=0 & <=100 is used in the program below to identify snowy pixels which is fine) --> good (this is the only case when MODSCAG value is retained)
+;       MOD10A1
+;		0-1 (fractional snow) --> good (this is the only case when MODSCAG value is retained)
 ;         200 (missing data) --> missing
 ;         201 (no decision) --> missing
 ;         211 (night) --> missing
@@ -17,6 +18,18 @@
 ;         254 (detector saturated) --> missing
 ;         255 (fill) --> missing
 ;         -9999 --> missing
+;
+; Note 4: MODSCAG (added 6/13/2014, Dominik Schneider)
+;		0-1 (fractional snow) --> good (this is the only case when MODSCAG value is retained)
+;         201 (no decision) --> missing
+;         230 (pixel off grid) --> missing
+;         235 (pixel not run) --> missing
+;         250 (cloud) --> missing
+;		  253 (water masked) --> force 0
+;         255 (at least 1 modis band no data) --> missing
+;         -9999 --> missing
+;
+;
 ;
 ; Copyright (C) 2011. All rights reserved.
 ;---------------------------------------------------------------------------------
@@ -30,8 +43,24 @@ common param
 
 print,'[SNODIS info] running prepare_interppt_doy_fsca...'
 
-temp_dir=snodis_root+'temp/'+area+'/'
-if ~file_test(temp_dir,/directory) then spawn,'mkdir -p '+temp_dir
+;use environment variable TMPDIR to create /temp on execution node. if running on janus with array job then must change TMPDIR directory in submission script to not include [ ].
+;mytemp=getenv('TMPDIR')
+;temp_dir=mytemp+'/'+'temp/'+area+'/' ;DO include trailing slash.
+;if ~file_test(temp_dir,/directory) then spawn,'mkdir -p '+temp_dir
+
+;escape [ and ] in TMPDIR
+;mytemp=getenv('TMPDIR') ; use next line to escape [ and ] in directory name when running job array.
+;spawn,'printenv TMPDIR | sed "s/\[/\\\[/" | sed "s/\]/\\\]/"',mytemp
+;temp_dir=mytemp+'/'+'temp/'+area+'/' ;DO include trailing slash.
+
+;trying to use symbolic links to define temp_dir
+;mytemp=getenv('TMPDIR')
+;tempf=mytemp+'/'+'temp/'+area+'/'
+;spawn,'mkdir -p '+tempf
+;if ~file_test(tempf,/directory) then spawn,'mkdir -p '+tempf
+;spawn, 'ln -sf '+tempf+' /local/scratch/temp_dir'
+;temp_dir='/local/scratch/temp_dir/'
+
 
 num_fsca=n_elements(fsca_doy)
 
@@ -45,9 +74,9 @@ first_fsca=replicate(-10.0,ncols_snodis,nrows_snodis)
 i=0
 temp_fsca=fsca_cube[i]
 temp_fscamask=fscamask_cube[i]
-tmp_index=where(temp_fscamask eq 225 or temp_fscamask eq 237 or temp_fscamask eq 239,tmp_cnt); indices of land/inland-water/ocean pixels.
+tmp_index=where(temp_fscamask eq 253 ,tmp_cnt); indices of land/inland-water/ocean pixels.
 if tmp_cnt ne 0 then first_fsca[tmp_index]=0.0; force to zero.
-tmp_index=where(temp_fscamask ge 0.0 and temp_fscamask le 100.0,tmp_cnt); indices of cloud-free pixels.
+tmp_index=where(temp_fscamask ge 0.0 and temp_fscamask le 1.0,tmp_cnt); indices of cloud-free pixels.
 if tmp_cnt ne 0 then first_fsca[tmp_index]=temp_fsca[tmp_index]
 index=where(first_fsca eq -10.0,count); see if any pixels still need to be filled in.
 while count ne 0 do begin
@@ -59,7 +88,7 @@ while count ne 0 do begin
   endif
   temp_fsca=fsca_cube[i]
   temp_fscamask=fscamask_cube[i]
-  index2=where(temp_fscamask[index] ge 0.0 and temp_fscamask[index] le 100.0, count2) ; count cloud-free pixels in next cloud image.
+  index2=where(temp_fscamask[index] ge 0.0 and temp_fscamask[index] le 1.0, count2) ; count cloud-free pixels in next cloud image.
   if count2 ne 0 then begin
      index3=index[index2]
      first_fsca[index3]=temp_fsca[index3]
@@ -69,12 +98,12 @@ endwhile
 
 ; adjust last snow image by setting the value of each pixel in the last fsca image to the last cloud-free pixel for the season.
 last_fsca=replicate(-10.0,ncols_snodis,nrows_snodis)
-i=num_fsca-1 
+i=num_fsca-1
 temp_fsca=fsca_cube[i]
 temp_fscamask=fscamask_cube[i]
-tmp_index=where(temp_fscamask eq 225 or temp_fscamask eq 237 or temp_fscamask eq 239,tmp_cnt); indices of land/inland-water/ocean pixels.
+tmp_index=where(temp_fscamask eq 253,tmp_cnt); indices of land/inland-water/ocean pixels.
 if tmp_cnt ne 0 then last_fsca[tmp_index]=0.0; force to zero.
-tmp_index=where(temp_fscamask ge 0.0 and temp_fscamask le 100.0,tmp_cnt); indices of cloud-free pixels.
+tmp_index=where(temp_fscamask ge 0.0 and temp_fscamask le 1.0,tmp_cnt); indices of cloud-free pixels.
 if tmp_cnt ne 0 then last_fsca[tmp_index]=temp_fsca[tmp_index]
 index=where(last_fsca eq -10.0,count); see if any pixels still need to be filled in.
 while count ne 0 do begin
@@ -86,7 +115,7 @@ while count ne 0 do begin
   endif
   temp_fsca=fsca_cube[i]
   temp_fscamask=fscamask_cube[i]
-  index2=where(temp_fscamask[index] ge 0.0 and temp_fscamask[index] le 100.0,count2); indices of cloud-free pixels.
+  index2=where(temp_fscamask[index] ge 0.0 and temp_fscamask[index] le 1.0,count2); indices of cloud-free pixels.
   if count2 ne 0 then begin
      index3=index[index2]
      last_fsca[index3]=temp_fsca[index3]
@@ -117,23 +146,23 @@ fsca_interp_end=assoc(14,fltarr(ncols_snodis,nrows_snodis))
 for i=0,num_interp_interval-1 do begin; loop over all interpolation intervals.
    print,string(i+1,num_interp_interval,format='("[SNODIS info] step ",I0," of ",I0," in prepare_interppt_doy_fsca...")')
 
-   if i eq 0 then begin; fill in first layer of fsca_interp_start. 
+   if i eq 0 then begin; fill in first layer of fsca_interp_start.
       fsca_interp_start[i]=fsca_cube[i]; fsca_cube[0] has no missing values due to filling procedures earlier.
-      doy_interp_start[i]=replicate(fsca_doy[i],ncols_snodis,nrows_snodis)  
+      doy_interp_start[i]=replicate(fsca_doy[i],ncols_snodis,nrows_snodis)
    endif else begin; fill in other layers of fsca_interp_start.
       j=i
       temp_y=fsca_cube[j]
       y=replicate(-10.0,ncols_snodis,nrows_snodis)
       t=fltarr(ncols_snodis,nrows_snodis)
-      index=where(fscamask_cube[j] eq 225 or fscamask_cube[j] eq 237 or fscamask_cube[j] eq 239,count); indices of land/inland-water/ocean pixels.
+      index=where(fscamask_cube[j] eq 253 ,count); indices of land/inland-water/ocean pixels.
       if count ne 0 then begin
          y[index]=0.0; force to zero.
          t[index]=fsca_doy[j]
       endif
-      index=where(fscamask_cube[j] ge 0.0 and fscamask_cube[j] le 100.0,count); indices of cloud-free pixels.
+      index=where(fscamask_cube[j] ge 0.0 and fscamask_cube[j] le 1.0,count); indices of cloud-free pixels.
       if count ne 0 then begin
          y[index]=temp_y[index]; fill in as many non-cloudy pixels with snow as possible.
-         t[index]=fsca_doy[j] 
+         t[index]=fsca_doy[j]
       endif
       index=where(y eq -10.0,count); see if any pixels still need to be filled in.
       while count ne 0 do begin
@@ -145,18 +174,18 @@ for i=0,num_interp_interval-1 do begin; loop over all interpolation intervals.
             break; exit the while loop gracefully (because fsca_cube[0] has no missing values due to filling procedures earlier).
          endif
          temp_fscamask=fscamask_cube[j]
-         index2=where(temp_fscamask[index] ge 0.0 and temp_fscamask[index] le 100.0,count2)
+         index2=where(temp_fscamask[index] ge 0.0 and temp_fscamask[index] le 1.0,count2)
          if count2 ne 0 then begin
             index3=index[index2]
             y[index3]=temp_y[index3]; fill in as many non-cloudy pixels with snow as possible.
-            t[index3]=fsca_doy[j]        
-         endif 
+            t[index3]=fsca_doy[j]
+         endif
          index=where(y eq -10.0,count)
       endwhile
       fsca_interp_start[i]=y
       doy_interp_start[i]=t
    endelse
- 
+
    if i eq num_interp_interval-1 then begin; fill in last layer of fsca_interp_end.
       fsca_interp_end[i]=fsca_cube[i+1]; fsca_cube[<end>] has no missing values due to filling procesures earlier.
       doy_interp_end[i]=replicate(fsca_doy[i+1],ncols_snodis,nrows_snodis)
@@ -165,12 +194,12 @@ for i=0,num_interp_interval-1 do begin; loop over all interpolation intervals.
       temp_y=fsca_cube[j+1]
       y=replicate(-10.0,ncols_snodis,nrows_snodis)
       t=fltarr(ncols_snodis,nrows_snodis)
-      index=where(fscamask_cube[j+1] eq 225 or fscamask_cube[j+1] eq 237 or fscamask_cube[j+1] eq 239,count); indices of land/inland-water/ocean pixels.
+      index=where(fscamask_cube[j+1] eq 253,count); indices of land/inland-water/ocean pixels.
       if count ne 0 then begin
          y[index]=0.0; force to zero.
          t[index]=fsca_doy[j+1]
       endif
-      index=where(fscamask_cube[j+1] ge 0.0 and fscamask_cube[j+1] le 100.0,count); indices of cloud-free pixels.
+      index=where(fscamask_cube[j+1] ge 0.0 and fscamask_cube[j+1] le 1.0,count); indices of cloud-free pixels.
       if count ne 0 then begin
          y[index]=temp_y[index]
          t[index]=fsca_doy[j+1]
@@ -185,11 +214,11 @@ for i=0,num_interp_interval-1 do begin; loop over all interpolation intervals.
             break; exit the loop gracefully (because fsca_cube[<end>] has no missing values due to filling procedures earlier).
          endif
          temp_fscamask=fscamask_cube[j+1]
-         index2=where(temp_fscamask[index] ge 0.0 and temp_fscamask[index] le 100.0,count2)
+         index2=where(temp_fscamask[index] ge 0.0 and temp_fscamask[index] le 1.0,count2)
          if count2 ne 0 then begin
             index3=index[index2]
             y[index3]=temp_y[index3]; fill in as many non-cloudy pixels with snow as possible.
-            t[index3]=fsca_doy[j+1] 
+            t[index3]=fsca_doy[j+1]
          endif
          index=where(y eq -10.0,count)
       endwhile
