@@ -28,6 +28,18 @@ num_forcing_step=(julday(nldas_last_month,nldas_last_day,year)-julday(1,1,year)+
 ratio_cols=ncols_snodis/ncols_nldas
 ratio_rows=nrows_snodis/nrows_nldas
 
+; read in forest density to adjust windspeed based on forest fraction
+; read forden (cannot have missing values).
+; forden is used (1) in prepare_fsca_fscamask.pro to apply vgf-correction, (2) in calc_turblong.pro, and (3) calc_energy.pro to scale incoming solar radiation with forsol_coeff (4) here to reduce windspeed according to forest fraction
+forden_in_dir=snodis_root+'input_static/'+area+'/'; DO include trailing slash.
+forden_in_file='forden.dat'; input file name.
+forden=fltarr(ncols_snodis,nrows_snodis); [0--1 non-dimensional]
+if file_test(forden_in_dir+forden_in_file) then begin
+openr,1,forden_in_dir+forden_in_file
+readu,1,forden
+close,1
+endif
+
 ; read in DEM on NLDAS grid (1/8 deg x 1/8 deg).
 dem_nldas=fltarr(ncols_nldas,nrows_nldas)
 openr,1,snodis_root+'input_static/'+area+'/dem4nldas.dat'
@@ -104,10 +116,15 @@ position_col=(findgen(ncols_snodis)-(ratio_cols/2-0.5))/ratio_cols
 position_row=(findgen(nrows_snodis)-(ratio_rows/2-0.5))/ratio_rows
 residual_snodis=interpolate(residual_nldas,position_col,position_row,/grid)
 var_snodis=dem_snodis*slope+residual_snodis
+
 if varname eq 'windspeed' || varname eq 'precip' then begin; these variables cannot physically be negative.
 tmp_index=where(var_snodis lt 0.0,tmp_cnt)
 if tmp_cnt ne 0 then var_snodis(tmp_index)=0.0
 endif
+
+if varname eq 'windspeed' then var_snodis=var_snodis*(1-0.8*forden)
+;windspeed = windspeed * (1-0.8*forden) ; Tarboton et al. 1996. pg 17 corrects windspeed for forest fraction.
+
 tmp_index=where(~finite(var_snodis),tmp_cnt)
 if tmp_cnt ne 0 then var_snodis(tmp_index)=undefo; replace NaN's with undefo for file output.
 var_snodis_cube(i)=var_snodis
