@@ -21,7 +21,7 @@ fscamask_in_dir=snodis_root+'input_fscamask/'+area+'/'+strcompress(year,/remove_
 fscamask_in_file=strcompress(year,/remove_all)+'.dat'
 
 forden_in_dir=snodis_root+'input_static/'+area+'/'; DO include trailing slash.
-forden_in_file='forden.dat'
+;input file name set in main
 
 dateselect_in_dir=snodis_root+'input_fsca/'+area+'/'+strcompress(year,/remove_all)+'/'; DO include trailing slash.
 dateselect_in_file='dateselect.txt'
@@ -32,8 +32,24 @@ dateselect_in_file='dateselect.txt'
 
 print,'[SNODIS info] running prepare_fsca_fscamask...'
 
-temp_dir=snodis_root+'temp/'+area+'/'
-if ~file_test(temp_dir,/directory) then spawn,'mkdir -p '+temp_dir
+;use environment variable TMPDIR to create /temp on execution node. if running on janus with array job then must change TMPDIR directory in submission script to not include [ ].
+; mytemp=getenv('TMPDIR')
+; temp_dir=mytemp+'/'+'temp/'+area+'/' ;DO include trailing slash.
+; if ~file_test(temp_dir,/directory) then spawn,'mkdir -p '+temp_dir
+
+;escape [ and ] in TMPDIR
+;mytemp=getenv('TMPDIR') ; use next line to escape [ and ] in directory name when running job array.
+;spawn,'printenv TMPDIR | sed "s/\[/\\\[/" | sed "s/\]/\\\]/"',mytemp
+;temp_dir=mytemp+'/'+'temp/'+area+'/' ;DO include trailing slash.
+
+;trying to use symbolic links to define temp_dir
+;mytemp=getenv('TMPDIR')
+;tempf=mytemp+'/'+'temp/'+area+'/'
+;spawn,'mkdir -p '+tempf
+;if ~file_test(tempf,/directory) then spawn,'mkdir -p '+tempf
+;spawn, 'ln -sf '+tempf+' /local/scratch/temp_dir'
+;temp_dir='/local/scratch/temp_dir/'
+
 
 ; get dateselect (selected calendar dates from a .txt file; date format: DDMMMYYYY).
 spawn,'wc -l '+dateselect_in_dir+dateselect_in_file,rc

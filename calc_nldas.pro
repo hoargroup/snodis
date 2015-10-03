@@ -32,8 +32,8 @@ ratio_rows=nrows_snodis/nrows_nldas
 ; read forden (cannot have missing values).
 ; forden is used (1) in prepare_fsca_fscamask.pro to apply vgf-correction, (2) in calc_turblong.pro, and (3) calc_energy.pro to scale incoming solar radiation with forsol_coeff (4) here to reduce windspeed according to forest fraction
 forden_in_dir=snodis_root+'input_static/'+area+'/'; DO include trailing slash.
-forden_in_file='forden.dat'; input file name.
 forden=fltarr(ncols_snodis,nrows_snodis); [0--1 non-dimensional]
+;input file name set in main
 if file_test(forden_in_dir+forden_in_file) then begin
 openr,1,forden_in_dir+forden_in_file
 readu,1,forden
@@ -110,7 +110,7 @@ endif else begin; constant field.
 slope=0.0
 corr=1.0
 endelse
-print,'[SNODIS info] r = ',corr
+;print,'[SNODIS info] r = ',corr
 residual_nldas=var_nldas-dem_nldas*slope
 position_col=(findgen(ncols_snodis)-(ratio_cols/2-0.5))/ratio_cols
 position_row=(findgen(nrows_snodis)-(ratio_rows/2-0.5))/ratio_rows
@@ -128,6 +128,7 @@ if varname eq 'windspeed' then var_snodis=var_snodis*(1-0.8*forden)
 tmp_index=where(~finite(var_snodis),tmp_cnt)
 if tmp_cnt ne 0 then var_snodis(tmp_index)=undefo; replace NaN's with undefo for file output.
 var_snodis_cube(i)=var_snodis
+
 endfor
 
 close,3,4
