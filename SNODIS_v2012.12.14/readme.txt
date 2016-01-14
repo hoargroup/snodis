@@ -1,1 +1,0 @@
-calc_nldas.pro was updated to correct wind speed for forest density on 2013.06.18. Use those other input files to to run 2012.12.14 version
